@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@theme {
+  /* CycleCare Design Palette */
+  --color-primary: #e11d48;        /* Rosy Pink */
+  --color-primary-light: #ffe4e6;  /* Soft Warm Pink */
+  --color-primary-dark: #9f1239;   /* Deep Rose */
+  --color-secondary: #8b5cf6;      /* Lavender/Purple */
+  --color-secondary-light: #ede9fe;/* Soft Lavender */
+  --color-secondary-dark: #6d28d9; /* Deep Purple */
+  
+  --color-accent: #f472b6;         /* Pastel Pink accent */
+  --color-accent-light: #fdf2f8;   /* Light Pastel Pink */
+  
+  --color-bg-base: #fffafb;        /* Calming cream/pink-tinted background */
+  --color-bg-card: #ffffff;        /* Pure white cards */
+  --color-border-soft: #f1e3e6;    /* Soft pinkish grey borders */
+  
+  --color-text-dark: #1e1b1c;      /* Soft dark brown/black text */
+  --color-text-muted: #6b7280;     /* Muted grey */
+  
+  /* Status Colors */
+  --color-fertile: #3b82f6;        /* Blue fertile window */
+  --color-fertile-light: #dbeafe;  /* Light blue fertile window */
+  --color-ovulation: #06b6d4;      /* Cyan ovulation day */
+  
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+}
+
+body {
+  background-color: var(--color-bg-base);
+  color: var(--color-text-dark);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-base);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-primary-light);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
