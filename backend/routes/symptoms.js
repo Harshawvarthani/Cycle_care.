@@ -165,4 +165,125 @@ router.get('/trends', auth, async (req, res) => {
   }
 });
 
+// @route   GET api/symptoms/correlations
+// @desc    Calculate average energy, sleep, and symptoms grouped by menstrual cycle phase
+// @access  Private
+router.get('/correlations', auth, async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const Cycle = require('../models/Cycle');
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ msg: 'User not found' });
+    }
+
+    const avgCycleLength = user.averageCycleLength || 28;
+    const avgPeriodLength = user.averagePeriodLength || 5;
+
+    // Fetch all logs and cycle records
+    const logs = await Symptom.find({ userId: req.user.id }).sort({ date: 1 });
+    const cycles = await Cycle.find({ userId: req.user.id }).sort({ startDate: 1 });
+
+    // Initial phase buckets
+    const phaseStats = {
+      Menstrual: { energySum: 0, sleepSum: 0, count: 0, symptoms: {} },
+      Follicular: { energySum: 0, sleepSum: 0, count: 0, symptoms: {} },
+      Ovulation: { energySum: 0, sleepSum: 0, count: 0, symptoms: {} },
+      Luteal: { energySum: 0, sleepSum: 0, count: 0, symptoms: {} }
+    };
+
+    const energyMap = { low: 1, medium: 2, high: 3 };
+    const sleepMap = { poor: 1, average: 2, good: 3 };
+
+    logs.forEach(log => {
+      const logDate = new Date(log.date);
+      logDate.setHours(0, 0, 0, 0);
+
+      // Find the anchor start date for this log's cycle
+      let anchorDate = null;
+
+      // Find the latest cycle start date that is <= logDate
+      const matchingCycle = [...cycles].reverse().find(c => {
+        const start = new Date(c.startDate);
+        start.setHours(0, 0, 0, 0);
+        return start <= logDate;
+      });
+
+      if (matchingCycle) {
+        anchorDate = new Date(matchingCycle.startDate);
+      } else if (user.lastPeriodDate) {
+        anchorDate = new Date(user.lastPeriodDate);
+      }
+
+      if (!anchorDate) return;
+
+      anchorDate.setHours(0, 0, 0, 0);
+
+      // Calculate cycle day relative to anchorDate
+      const diffTime = logDate - anchorDate;
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      
+      let cycleDay = (diffDays % avgCycleLength) + 1;
+      if (cycleDay <= 0) cycleDay += avgCycleLength;
+
+      // Categorize dayOfCycle into phase
+      let phase = 'Follicular';
+      const ovulationStart = avgCycleLength - 14 - 5;
+      const ovulationEnd = avgCycleLength - 14 + 1;
+
+      if (cycleDay <= avgPeriodLength) {
+        phase = 'Menstrual';
+      } else if (cycleDay >= ovulationStart && cycleDay <= ovulationEnd) {
+        phase = 'Ovulation';
+      } else if (cycleDay < ovulationStart) {
+        phase = 'Follicular';
+      } else {
+        phase = 'Luteal';
+      }
+
+      // Aggregate energy, sleep, symptoms
+      const eVal = energyMap[log.energy] || 0;
+      const sVal = sleepMap[log.sleep] || 0;
+
+      if (eVal > 0) {
+        phaseStats[phase].energySum += eVal;
+        phaseStats[phase].count++;
+      }
+      if (sVal > 0) {
+        phaseStats[phase].sleepSum += sVal;
+        if (eVal === 0) phaseStats[phase].count++; // Avoid double count
+      }
+
+      if (log.symptoms && Array.isArray(log.symptoms)) {
+        log.symptoms.forEach(sym => {
+          phaseStats[phase].symptoms[sym] = (phaseStats[phase].symptoms[sym] || 0) + 1;
+        });
+      }
+    });
+
+    // Format stats for frontend charting
+    const correlations = Object.keys(phaseStats).map(phaseName => {
+      const p = phaseStats[phaseName];
+      const countVal = p.count || 1;
+      const topSymptoms = Object.entries(p.symptoms)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(entry => entry[0]);
+
+      return {
+        phase: phaseName,
+        avgEnergy: parseFloat((p.energySum / countVal).toFixed(2)) || 0,
+        avgSleep: parseFloat((p.sleepSum / countVal).toFixed(2)) || 0,
+        topSymptoms: topSymptoms.length > 0 ? topSymptoms : ['None Logged']
+      };
+    });
+
+    res.json(correlations);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
 module.exports = router;

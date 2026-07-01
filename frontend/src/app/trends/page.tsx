@@ -28,6 +28,7 @@ export default function TrendsPage() {
   const [bbtData, setBbtData] = useState<BBTItem[]>([]);
   const [weightData, setWeightData] = useState<any[]>([]);
   const [cycleLengthData, setCycleLengthData] = useState<CycleLengthItem[]>([]);
+  const [correlationsData, setCorrelationsData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -63,7 +64,6 @@ export default function TrendsPage() {
 
       // 2. Fetch cycle records to calculate cycle duration gaps
       const cycles = await apiFetch('/cycles');
-      // Sort oldest to newest
       const sortedCycles = [...cycles].sort((a: any, b: any) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
       
       const lengths: CycleLengthItem[] = [];
@@ -79,6 +79,14 @@ export default function TrendsPage() {
         }
       }
       setCycleLengthData(lengths);
+
+      // 3. Fetch wellness phase correlations
+      try {
+        const corr = await apiFetch('/symptoms/correlations');
+        setCorrelationsData(corr || []);
+      } catch (corrErr) {
+        console.warn('Failed to load correlations:', corrErr);
+      }
     } catch (err) {
       console.error('Failed to load trends:', err);
     } finally {
@@ -285,6 +293,56 @@ export default function TrendsPage() {
                 </LineChart>
               </ResponsiveContainer>
             )}
+          </div>
+        </div>
+
+        {/* Chart 6: Phase-by-Phase Wellness Correlation */}
+        <div className="bg-white rounded-3xl shadow-md border border-border-soft p-6 space-y-4 lg:col-span-2">
+          <h3 className="text-base font-bold text-text-dark flex items-center gap-2">
+            <Heart className="h-5 w-5 text-primary fill-current" />
+            Phase-by-Phase Wellness Correlation
+          </h3>
+          <p className="text-xs text-text-muted">
+            Average energy levels and sleep quality scores (from 1 to 3) mapped across each cycle phase.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-2 h-72 w-full">
+              {correlationsData.length === 0 ? (
+                <div className="h-full flex items-center justify-center text-xs text-text-muted">
+                  Log symptoms on different days of your cycle to generate wellness correlations.
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={correlationsData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f1e3e6" />
+                    <XAxis dataKey="phase" stroke="#6b7280" fontSize={11} />
+                    <YAxis domain={[0, 3]} stroke="#6b7280" fontSize={11} />
+                    <Tooltip contentStyle={{ background: '#fff', borderRadius: '1rem', border: '1px solid #f1e3e6', fontSize: '12px' }} />
+                    <Legend verticalAlign="top" height={36} />
+                    <Bar dataKey="avgEnergy" name="Average Energy (1-3)" fill="#f59e0b" radius={[6, 6, 0, 0]} maxBarSize={30} />
+                    <Bar dataKey="avgSleep" name="Average Sleep (1-3)" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={30} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Top symptoms list by phase */}
+            <div className="space-y-4 flex flex-col justify-center">
+              <h4 className="text-xs font-bold text-text-dark uppercase tracking-wider">Top Phase Symptoms</h4>
+              <div className="space-y-3">
+                {correlationsData.map((c: any) => (
+                  <div key={c.phase} className="p-3 bg-bg-base/70 rounded-2xl border border-border-soft flex justify-between items-center text-xs">
+                    <span className="font-bold text-text-dark">{c.phase}:</span>
+                    <span className="text-text-muted font-medium italic text-right">
+                      {c.topSymptoms && c.topSymptoms.length > 0 ? c.topSymptoms.join(', ') : 'None'}
+                    </span>
+                  </div>
+                ))}
+                {correlationsData.length === 0 && (
+                  <p className="text-xs text-text-muted italic">No symptoms correlation data compiled.</p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

@@ -13,6 +13,11 @@ export default function ProfilePage() {
   const [goal, setGoal] = useState<'track' | 'avoid' | 'conceive'>('track');
   const [averageCycleLength, setAverageCycleLength] = useState(28);
   const [averagePeriodLength, setAveragePeriodLength] = useState(5);
+
+  // CareCircle Sharing states
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  const [shareExpiresAt, setShareExpiresAt] = useState<string | null>(null);
+  const [sharingLoading, setSharingLoading] = useState(false);
   
   // Settings states
   const [unitTemperature, setUnitTemperature] = useState<'C' | 'F'>('C');
@@ -78,6 +83,57 @@ export default function ProfilePage() {
       fetchLatestWeight();
     }
   }, [user]);
+
+  const fetchActiveShare = async () => {
+    try {
+      const active = await apiFetch('/share/active');
+      if (active) {
+        setShareToken(active.token);
+        setShareExpiresAt(active.expiresAt);
+      } else {
+        setShareToken(null);
+        setShareExpiresAt(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch active share:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchActiveShare();
+    }
+  }, [user]);
+
+  const handleGenerateShare = async () => {
+    setSharingLoading(true);
+    try {
+      const res = await apiFetch('/share/generate', { method: 'POST' });
+      setShareToken(res.token);
+      setShareExpiresAt(res.expiresAt);
+      setSuccess('Sharing link generated successfully.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate sharing link.');
+    } finally {
+      setSharingLoading(false);
+    }
+  };
+
+  const handleRevokeShare = async () => {
+    setSharingLoading(true);
+    try {
+      await apiFetch('/share/revoke', { method: 'PUT' });
+      setShareToken(null);
+      setShareExpiresAt(null);
+      setSuccess('Sharing links revoked successfully.');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      setError(err.message || 'Failed to revoke sharing links.');
+    } finally {
+      setSharingLoading(false);
+    }
+  };
 
   const handleUnitWeightChange = (newUnit: 'kg' | 'lbs') => {
     setUnitWeight(newUnit);
@@ -464,6 +520,67 @@ export default function ProfilePage() {
             </div>
           );
         })()}
+
+        {/* CareCircle Sharing Card */}
+        <div className="bg-white rounded-3xl shadow-md border border-border-soft p-6 space-y-4">
+          <h3 className="text-base font-bold text-text-dark flex items-center gap-2">
+            <Heart className="h-5.5 w-5.5 text-primary fill-current" />
+            CareCircle Partner Sharing
+          </h3>
+          <p className="text-xs text-text-muted leading-relaxed">
+            Generate a secure, privacy-controlled sharing link for your partner. They can see your current cycle phase and helper tips, keeping all your symptom entries and notes completely private.
+          </p>
+
+          {shareToken ? (
+            <div className="space-y-3 pt-2">
+              <div className="p-3 bg-bg-base rounded-2xl border border-border-soft text-xs space-y-2">
+                <p className="text-[10px] uppercase font-bold text-text-muted">Your Share Link (Expires in 7 days)</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={typeof window !== 'undefined' ? `${window.location.origin}/share/${shareToken}` : ''}
+                    className="flex-1 bg-white border border-border-soft rounded-lg px-2 py-1 text-[11px] text-text-dark focus:outline-none select-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        navigator.clipboard.writeText(`${window.location.origin}/share/${shareToken}`);
+                        setSuccess('Copied sharing link to clipboard!');
+                        setTimeout(() => setSuccess(''), 2500);
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-secondary hover:bg-secondary-dark text-white font-bold rounded-lg text-[10px] transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-[9px] text-text-muted">
+                  Expires: {shareExpiresAt ? new Date(shareExpiresAt).toLocaleDateString() : ''} at {shareExpiresAt ? new Date(shareExpiresAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRevokeShare}
+                disabled={sharingLoading}
+                className="w-full py-2 px-3 border border-red-200 hover:bg-red-50 text-red-600 rounded-2xl font-bold text-xs transition-colors"
+              >
+                Revoke Access Immediately
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleGenerateShare}
+              disabled={sharingLoading}
+              className="w-full py-3.5 px-4 rounded-2xl shadow-sm text-xs font-bold text-white bg-primary hover:bg-primary-dark transition-colors"
+            >
+              Enable Partner Sharing
+            </button>
+          )}
+        </div>
 
         {/* PDF Health Report card */}
         <div className="bg-white rounded-3xl shadow-md border border-border-soft p-6 space-y-4">

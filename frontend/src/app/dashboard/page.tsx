@@ -57,6 +57,14 @@ export default function Dashboard() {
   const [currentDate, setCurrentDate] = useState(new Date()); // Calendar navigation month
   const [loading, setLoading] = useState(true);
 
+  // Chatbot State Hooks
+  const [activeTab, setActiveTab] = useState<'insights' | 'chat'>('insights');
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: 'user' | 'ai'; text: string }>>([
+    { sender: 'ai', text: "Hi! I'm your CycleCare health companion. Based on your cycle logs and daily symptoms, I can provide gentle, personalized advice. What's on your mind today?" }
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+
   const loadData = async () => {
     try {
       const pred = await apiFetch('/cycles/predictions');
@@ -99,6 +107,35 @@ export default function Dashboard() {
       setInsightError(err.message || 'Need more logs. Please log at least 1 cycle to generate insights.');
     } finally {
       setInsightLoading(false);
+    }
+  };
+
+  const handleSendChat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = chatInput.trim();
+    if (!trimmed || chatLoading) return;
+
+    const userMsg = { sender: 'user' as const, text: trimmed };
+    setChatMessages(prev => [...prev, userMsg]);
+    setChatInput('');
+    setChatLoading(true);
+
+    try {
+      const history = chatMessages.map(m => ({
+        role: m.sender === 'user' ? 'user' as const : 'assistant' as const,
+        content: m.text
+      }));
+
+      const res = await apiFetch('/insights/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message: trimmed, history })
+      });
+
+      setChatMessages(prev => [...prev, { sender: 'ai', text: res.response }]);
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { sender: 'ai', text: `Sorry, I encountered an error: ${err.message || 'Something went wrong.'}` }]);
+    } finally {
+      setChatLoading(false);
     }
   };
 
@@ -402,89 +439,169 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* AI Insight Sidebar */}
-        <div className="bg-white rounded-3xl shadow-md border border-border-soft p-6 flex flex-col justify-between">
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-text-dark flex items-center gap-1.5">
-                <Sparkles className="h-5 w-5 text-primary fill-current" />
-                AI Health Insights
-              </h3>
+        {/* AI Sidebar & Chat Companion */}
+        <div className="bg-white rounded-3xl shadow-md border border-border-soft p-6 flex flex-col justify-between min-h-[500px]">
+          <div className="flex flex-col h-full">
+            {/* Tab Headers */}
+            <div className="flex border-b border-border-soft mb-4">
               <button
-                onClick={generateAIInsights}
-                disabled={insightLoading}
-                className="p-1 text-xs font-semibold text-primary hover:text-primary-dark transition-colors disabled:opacity-50"
+                onClick={() => setActiveTab('insights')}
+                className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-colors ${
+                  activeTab === 'insights'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-text-muted hover:text-text-dark'
+                }`}
               >
-                {insightLoading ? 'Analyzing...' : 'Refresh'}
+                Health Insights
+              </button>
+              <button
+                onClick={() => setActiveTab('chat')}
+                className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-colors ${
+                  activeTab === 'chat'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-text-muted hover:text-text-dark'
+                }`}
+              >
+                Chat Companion
               </button>
             </div>
 
-            {insightError && (
-              <div className="rounded-xl bg-red-50 p-4 border border-red-100 flex items-start gap-2 mb-4">
-                <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                <p className="text-xs text-red-700 font-semibold">{insightError}</p>
-              </div>
-            )}
-
-            {insight ? (
-              <div className="space-y-4">
-                {/* Regularity Card */}
-                <div className="bg-primary-light/10 border border-primary-light/40 rounded-2xl p-4">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-primary">
-                    Cycle Assessment
-                  </span>
-                  <h4 className="text-sm font-bold text-text-dark mt-1">
-                    {insight.cycleRegularity}
-                  </h4>
-                </div>
-
-                {/* Symptom Trends Card */}
-                <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-text-muted">
-                    Detected Patterns
-                  </span>
-                  {insight.symptomPatterns.map((pat, idx) => (
-                    <div key={idx} className="bg-bg-base/80 border border-border-soft rounded-xl p-3 text-xs leading-relaxed text-text-dark flex items-start gap-2">
-                      <Brain className="h-4.5 w-4.5 text-secondary shrink-0 mt-0.5" />
-                      <span>{pat}</span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Recommendation */}
-                <div className="bg-secondary/5 border border-secondary-light/35 rounded-2xl p-4">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-secondary-dark">
-                    Doctor's Suggestion
-                  </span>
-                  <p className="text-xs text-text-dark leading-relaxed mt-1 font-medium italic">
-                    "{insight.recommendation}"
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-text-muted space-y-3">
-                <Brain className="h-10 w-10 mx-auto text-primary-light animate-pulse" />
-                <p className="text-xs">
-                  {predictions?.hasHistory
-                    ? "Generate your personalized health insights. This compiles your symptoms and cycle logs."
-                    : "Start logging your period dates. We will use your logging history to generate health insights."}
-                </p>
-                {predictions?.hasHistory && (
+            {/* TAB CONTENT: INSIGHTS */}
+            {activeTab === 'insights' && (
+              <div className="space-y-4 flex-1">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-bold text-text-dark flex items-center gap-1.5">
+                    <Sparkles className="h-4.5 w-4.5 text-primary fill-current" />
+                    AI Health Insights
+                  </h3>
                   <button
                     onClick={generateAIInsights}
                     disabled={insightLoading}
-                    className="py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary-dark transition-colors"
+                    className="text-xs font-semibold text-primary hover:text-primary-dark transition-colors disabled:opacity-50"
                   >
-                    Generate Insights
+                    {insightLoading ? 'Analyzing...' : 'Refresh'}
                   </button>
+                </div>
+
+                {insightError && (
+                  <div className="rounded-xl bg-red-50 p-4 border border-red-100 flex items-start gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700 font-semibold">{insightError}</p>
+                  </div>
                 )}
+
+                {insight ? (
+                  <div className="space-y-4">
+                    {/* Regularity Card */}
+                    <div className="bg-primary-light/10 border border-primary-light/40 rounded-2xl p-4">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-primary">
+                        Cycle Assessment
+                      </span>
+                      <h4 className="text-sm font-bold text-text-dark mt-1">
+                        {insight.cycleRegularity}
+                      </h4>
+                    </div>
+
+                    {/* Symptom Trends Card */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-text-muted">
+                        Detected Patterns
+                      </span>
+                      {insight.symptomPatterns.map((pat, idx) => (
+                        <div key={idx} className="bg-bg-base/80 border border-border-soft rounded-xl p-3 text-xs leading-relaxed text-text-dark flex items-start gap-2">
+                          <Brain className="h-4.5 w-4.5 text-secondary shrink-0 mt-0.5" />
+                          <span>{pat}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Recommendation */}
+                    <div className="bg-secondary/5 border border-secondary-light/35 rounded-2xl p-4">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-secondary-dark">
+                        Doctor's Suggestion
+                      </span>
+                      <p className="text-xs text-text-dark leading-relaxed mt-1 font-medium italic">
+                        "{insight.recommendation}"
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-text-muted space-y-3">
+                    <Brain className="h-10 w-10 mx-auto text-primary-light animate-pulse" />
+                    <p className="text-xs">
+                      {predictions?.hasHistory
+                        ? "Generate your personalized health insights. This compiles your symptoms and cycle logs."
+                        : "Start logging your period dates. We will use your logging history to generate health insights."}
+                    </p>
+                    {predictions?.hasHistory && (
+                      <button
+                        onClick={generateAIInsights}
+                        disabled={insightLoading}
+                        className="py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-primary hover:bg-primary-dark transition-colors"
+                      >
+                        Generate Insights
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB CONTENT: CHAT */}
+            {activeTab === 'chat' && (
+              <div className="flex flex-col flex-1 h-[400px]">
+                {/* Chat Message Logs */}
+                <div className="flex-1 overflow-y-auto space-y-3 p-1 max-h-[300px] scrollbar-thin">
+                  {chatMessages.map((msg, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
+                          msg.sender === 'user'
+                            ? 'bg-primary text-white font-medium rounded-tr-none'
+                            : 'bg-bg-base text-text-dark border border-border-soft rounded-tl-none'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  {chatLoading && (
+                    <div className="flex justify-start">
+                      <div className="bg-bg-base text-text-muted border border-border-soft rounded-2xl rounded-tl-none px-3.5 py-2 text-xs animate-pulse">
+                        Analyzing your logs...
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Chat Send Form */}
+                <form onSubmit={handleSendChat} className="mt-3 pt-3 border-t border-border-soft flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="Ask about cramps, fatigue, cycles..."
+                    disabled={chatLoading}
+                    className="flex-1 px-3.5 py-2 bg-bg-base border border-border-soft rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-primary text-text-dark"
+                  />
+                  <button
+                    type="submit"
+                    disabled={chatLoading || !chatInput.trim()}
+                    className="px-3 py-2 bg-primary hover:bg-primary-dark text-white font-bold text-xs rounded-xl shadow-sm transition-colors disabled:opacity-50"
+                  >
+                    Send
+                  </button>
+                </form>
               </div>
             )}
           </div>
 
           <div className="mt-6 pt-4 border-t border-border-soft flex gap-2 items-center text-[10px] text-text-muted justify-center">
-            <AlertCircle className="h-3.5 w-3.5" />
-            <span>CycleCare AI is a supportive assistant. Consult a physician for diagnostic advice.</span>
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>AI tips are supportive insights. Consult a physician for diagnostic advice.</span>
           </div>
         </div>
       </div>

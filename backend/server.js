@@ -72,6 +72,7 @@ app.use('/api/symptoms', require('./routes/symptoms'));
 app.use('/api/hygiene', require('./routes/hygiene'));
 app.use('/api/insights', require('./routes/insights'));
 app.use('/api/reports', require('./routes/reports'));
+app.use('/api/share', require('./routes/share'));
 
 // Base Route
 app.get('/', (req, res) => {
