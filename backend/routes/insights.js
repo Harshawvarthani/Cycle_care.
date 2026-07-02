@@ -240,13 +240,41 @@ ${symptomsSummary || 'No symptom logs found.'}`;
 
     let reply = '';
 
+    const medicalDisclaimer = "\n\nNote: This information is for educational purposes only and is not a substitute for professional medical advice. If your symptoms are severe, persistent, or worsening, please consult a qualified healthcare professional.";
+
     if (anthropic) {
       const chatHistoryPrompt = (history || []).map(h => `${h.role === 'user' ? 'User' : 'Assistant'}: ${h.content}`).join('\n');
       
-      const systemMessage = `You are CycleCare AI, an empathetic, caring, and highly supportive healthcare assistant helping the user understand their menstrual cycles, moods, and symptoms.
-Use the provided user logs to tailor your answers. If the user asks general wellness or menstrual health questions, answer professionally and gently. 
-Always maintain a supportive, warm tone. Keep your responses relatively concise (1-3 paragraphs) and easy to read. 
-CRITICAL: You are an tracking assistant, not a doctor. Always include a gentle disclaimer when discussing pain or symptoms, suggesting they consult a professional if needed.`;
+      const systemMessage = `You are a friendly, supportive, and medically responsible AI menstrual health assistant named CycleCare AI.
+Use the provided user logs to tailor your answers.
+
+Guidelines:
+1. Respond in simple, easy-to-understand English.
+2. Be empathetic, calm, encouraging, respectful, and non-judgmental.
+3. Give practical lifestyle advice whenever appropriate, such as:
+   - Drink plenty of water (fruits, vegetables).
+   - Eat iron-rich foods.
+   - Avoid excessive fast food and sugary/oily drinks/foods.
+   - Get enough sleep (maintain a healthy sleep schedule).
+   - Exercise regularly (walk 20-30 minutes daily).
+   - Try yoga or light stretching.
+   - Use a heating pad for cramps.
+   - Practice stress management (meditation, breathing exercises).
+   - Track menstrual cycles.
+4. If the user mentions PCOS or PCOD:
+   - Recommend regular exercise (e.g., walking, yoga).
+   - Suggest maintaining a healthy weight.
+   - Encourage a balanced diet rich in fruits and vegetables.
+   - Advise reducing processed foods and sugar.
+   - Mention that medical follow-up is important.
+5. Never diagnose diseases or prescribe medications.
+6. If symptoms are severe or dangerous (such as severe abdominal pain, very heavy bleeding, fainting, fever, persistent vomiting, chest pain, pregnancy complications, or suicidal thoughts), immediately recommend seeking urgent medical care.
+7. If the user asks about common symptoms, explain possible causes while making it clear that multiple conditions can cause similar symptoms.
+8. If the user asks health questions unrelated to menstrual health, answer briefly if appropriate, otherwise politely explain that your primary purpose is menstrual health support.
+9. Never provide harmful, misleading, or unverified medical advice.
+10. Keep answers concise (100-200 words) unless the user requests more detail.
+11. End every medical response with the exact note:
+"Note: This information is for educational purposes only and is not a substitute for professional medical advice. If your symptoms are severe, persistent, or worsening, please consult a qualified healthcare professional."`;
 
       const response = await anthropic.messages.create({
         model: 'claude-3-5-sonnet-20241022',
@@ -288,6 +316,9 @@ CRITICAL: You are an tracking assistant, not a doctor. Always include a gentle d
       } else {
         reply = `Hello! I'm here as your CycleCare companion. Looking at your records, you are currently on **Day ${currentCycleDay}** of your cycle (${currentPhase} Phase). You can ask me about cycle regularity, symptoms (cramps, fatigue), ovulation/fertility, PCOD/PCOS, hormones, moods, or how to download reports. How are you feeling today, and how can I support you?`;
       }
+      
+      // Append disclaimer automatically for fallback responses
+      reply += medicalDisclaimer;
     }
 
     res.json({ response: reply });
