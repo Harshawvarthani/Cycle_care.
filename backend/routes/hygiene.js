@@ -60,6 +60,7 @@ router.put('/settings', auth, async (req, res) => {
     if (hygieneInterval !== undefined) user.settings.hygieneInterval = Number(hygieneInterval);
     if (hygieneProduct) user.settings.hygieneProduct = hygieneProduct;
 
+    user.markModified('settings');
     await user.save();
     res.json(user.settings);
   } catch (err) {

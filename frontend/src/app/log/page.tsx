@@ -7,7 +7,7 @@ import { apiFetch } from '../../utils/api';
 import { Heart, Save, Plus, X, Calendar, Activity, Eye, Smile, Coffee, Moon, Thermometer, ShieldAlert, Sparkles } from 'lucide-react';
 
 function LogForm() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -42,6 +42,8 @@ function LogForm() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [hygieneSaved, setHygieneSaved] = useState(false);
+  const [hygieneError, setHygieneError] = useState('');
 
   // Predefined symptoms and moods
   const availableSymptoms = ['Cramps', 'Bloating', 'Headache', 'Acne', 'Fatigue', 'Back Pain', 'Nausea'];
@@ -168,16 +170,19 @@ function LogForm() {
   };
 
   const updateHygieneSettings = async () => {
+    setHygieneSaved(false);
+    setHygieneError('');
     try {
       await apiFetch('/hygiene/settings', {
         method: 'PUT',
         body: JSON.stringify({ hygieneProduct, hygieneInterval })
       });
+      await refreshUser();
       loadHygieneData();
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setHygieneSaved(true);
+      setTimeout(() => setHygieneSaved(false), 3000);
     } catch (err: any) {
-      setSaveError(err.message || 'Failed to save settings.');
+      setHygieneError(err.message || 'Failed to save settings.');
     }
   };
 
@@ -721,6 +726,16 @@ function LogForm() {
             >
               Save Settings
             </button>
+            {hygieneSaved && (
+              <p className="text-center text-xs font-bold text-green-600 animate-fadeIn mt-2">
+                ✓ Settings saved successfully!
+              </p>
+            )}
+            {hygieneError && (
+              <p className="text-center text-xs font-bold text-red-600 animate-fadeIn mt-2">
+                ✗ {hygieneError}
+              </p>
+            )}
           </div>
         </div>
       </div>

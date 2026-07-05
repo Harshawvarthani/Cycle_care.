@@ -13,11 +13,18 @@ interface User {
   averagePeriodLength: number;
   goal: 'track' | 'avoid' | 'conceive';
   lastPeriodDate?: string;
+  height?: number | null;
   settings?: {
     unitTemperature: 'C' | 'F';
     unitWeight: 'kg' | 'lbs';
     hygieneInterval: number;
     hygieneProduct: 'pad' | 'tampon' | 'cup' | 'none';
+    notificationPreferences?: {
+      periodAlert: boolean;
+      fertileAlert: boolean;
+      dailyLogAlert: boolean;
+      hygieneAlert: boolean;
+    };
   };
 }
 
